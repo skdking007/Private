@@ -91,8 +91,7 @@ jobs:
           "runtime=$runtime" | Out-File -Append $env:GITHUB_OUTPUT
           "loops=$loops"     | Out-File -Append $env:GITHUB_OUTPUT
           Write-Host "Resolved: test=$isTest, runtime=$runtime, loops=$loops"
-
-      - name: ⚙️ Install Tailscale (if missing) & show version
+          - name: ⚙️ Install Tailscale (if missing) & show version
         run: |
           $exe = "C:\Program Files\Tailscale\tailscale.exe"
           if (-not (Test-Path $exe)) {
@@ -103,8 +102,7 @@ jobs:
           }
           Start-Service Tailscale -ErrorAction SilentlyContinue
           & "C:\Program Files\Tailscale\tailscale.exe" version
-
-      - name: 🔐 Enable RDP user + firewall
+        - name: 🔐 Enable RDP user + firewall
         run: |
           $u="${{ env.RDP_USER }}"; $p="${{ env.RDP_PASS }}"
           $sec = ConvertTo-SecureString $p -AsPlainText -Force
@@ -117,9 +115,8 @@ jobs:
             Enable-LocalUser -Name $u
           }
           Set-ItemProperty "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name fDenyTSConnections -Value 0
-          Enable-NetFirewallRule -DisplayGroup "Remote Desktop" | Out-Null
-
-      - name: 🧹 PURGE any devices containing 'bullet' (startup)
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop" | Out-Null 
+          - name: 🧹 PURGE any devices containing 'bullet' (startup)
         run: |
           $hdr = @{ Authorization = "Bearer ${{ steps.cfg.outputs.apikey }}" }
           $tn  = [uri]::EscapeDataString("${{ steps.cfg.outputs.tailnet }}")
