@@ -2,100 +2,56 @@ name: Windows RDP via Tailscale (A)
 
 on:
   workflow_dispatch:
-    inputs:
-      ts_tailnet:
-        description: "Tailscale tailnet (e.g. you@gmail.com)"
-        required: true
-      ts_api_key:
-        description: "Tailscale API key"
-        required: true
-      ts_authkey:
-        description: "Tailscale auth key"
-        required: true
-      gh_api_token:
-        description: "GitHub PAT (repo, workflow)"
-        required: true
-      runtime_minutes:
-        description: "Runtime in minutes (max 355)"
-        default: "355"
 
 permissions:
   contents: read
-  actions: write
 
 defaults:
   run:
     shell: pwsh
 
 env:
-  RDP_USER: Bullettemporary
+  RDP_USER: BulletUser
   RDP_PASS: Bullet@12345
   TS_HOSTNAME: bullet
 
 jobs:
   rdp:
     runs-on: windows-2022
-    timeout-minutes: 370
 
     steps:
-    - name: 🔧 Resolve inputs
-      id: cfg
-      run: |
-        $runtime=[int]"${{ inputs.runtime_minutes }}"
-        if ($runtime -gt 355) { $runtime=355 }
-        "runtime=$runtime" | Out-File -Append $env:GITHUB_OUTPUT
+      - name: 🔧 Resolve inputs
+        run: |
+          "runtime=355" | Out-File -Append $env:GITHUB_OUTPUT
 
-    - name: ⚙️ Install Tailscale
-      run: |
-        $exe="C:\Program Files\Tailscale\tailscale.exe"
-        if (!(Test-Path $exe)) {
-          Invoke-WebRequest https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe -OutFile ts.exe
-          Start-Process ts.exe -ArgumentList "/quiet" -Wait
-        }
-        Start-Service Tailscale
+      - name: ⚙️ Install Tailscale
+        run: |
+          if (!(Test-Path "C:\Program Files\Tailscale\tailscale.exe")) {
+            Invoke-WebRequest https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe -OutFile ts.exe
+            Start-Process ts.exe -ArgumentList "/quiet" -Wait
+          }
 
-    - name: 🔐 Enable RDP
-      run: |
-        $u="$env:RDP_USER"
-        $p="$env:RDP_PASS" | ConvertTo-SecureString -AsPlainText -Force
-        if (!(Get-LocalUser -Name $u -ErrorAction SilentlyContinue)) {
-          New-LocalUser -Name $u -Password $p
-          Add-LocalGroupMember Administrators $u
-          Add-LocalGroupMember "Remote Desktop Users" $u
-        }
-        Set-ItemProperty "HKLM:\System\CurrentControlSet\Control\Terminal Server" fDenyTSConnections 0
-        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+      - name: 🔐 Enable RDP
+        run: |
+          $sec = ConvertTo-SecureString "${{ env.RDP_PASS }}" -AsPlainText -Force
+          New-LocalUser "${{ env.RDP_USER }}" -Password $sec -ErrorAction SilentlyContinue
+          Add-LocalGroupMember -Group Administrators -Member "${{ env.RDP_USER }}" -ErrorAction SilentlyContinue
+          Set-ItemProperty "HKLM:\System\CurrentControlSet\Control\Terminal Server" fDenyTSConnections 0
 
-    - name: 🔗 Tailscale up
-      id: up
-      run: |
-        $ts="C:\Program Files\Tailscale\tailscale.exe"
-        & $ts up --authkey "${{ inputs.ts_authkey }}" --hostname "$env:TS_HOSTNAME"
-        $ip=& $ts ip -4
-        "ip4=$ip" | Out-File -Append $env:GITHUB_OUTPUT
+      - name: 🔗 Tailscale Up
+        id: up
+        run: |
+          & "C:\Program Files\Tailscale\tailscale.exe" up --hostname "${{ env.TS_HOSTNAME }}"
+          $ip = & "C:\Program Files\Tailscale\tailscale.exe" ip -4
+          "ip4=$ip" | Out-File -Append $env:GITHUB_OUTPUT
 
-    - name: 📢 Telegram Notify
-      run: |
-        $token="${{ secrets.TG_BOT_TOKEN }}"
-        $chat="${{ secrets.TG_CHAT_ID }}"
+      - name: 📢 Telegram Notify
+        run: |
+          $token = "${{ secrets.TG_BOT_TOKEN }}"
+          $chat  = "${{ secrets.TG_CHAT_ID }}"
+          $msg = "🖥️ Windows RDP Ready`nHost: $env:TS_HOSTNAME`nIP: ${{ steps.up.outputs.ip4 }}"
+          Invoke-RestMethod -Uri "https://api.telegram.org/bot$token/sendMessage" -Method POST -Body @{chat_id=$chat;text=$msg}
 
-        $msg=@"
-🖥️ Windows RDP Ready
-
-Host: $env:TS_HOSTNAME
-IP: ${{ steps.up.outputs.ip4 }}
-User: $env:RDP_USER
-Runtime: ${{ steps.cfg.outputs.runtime }} min
-"@
-
-        Invoke-RestMethod `
-          -Uri "https://api.telegram.org/bot$token/sendMessage" `
-          -Method POST `
-          -Body @{ chat_id=$chat; text=$msg }
-
-    - name: ⏳ Keep alive
-      run: |
-        $end=(Get-Date).AddMinutes([int]"${{ steps.cfg.outputs.runtime }}")
-        while((Get-Date) -lt $end){
-          Start-Sleep 60
-        }
+      - name: ⏳ Keep Alive
+        run: |
+          Start-Sleep -Seconds 300
