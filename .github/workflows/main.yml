@@ -1,0 +1,25 @@
+- name: 📢 Telegram Notify (RDP Ready)
+  run: |
+    $token = "8518931324:AAGm2hTgnlumFbsRVJxO81VscX-UoPBQ0JU"
+    $chat  = "6519274416"
+
+    $msg = @"
+🖥️ *Windows RDP Ready*
+
+🔹 Host: $env:TS_HOSTNAME
+🔹 IP: ${{ steps.up.outputs.ip4 }}
+🔹 DNS: ${{ steps.up.outputs.fqdn }}
+🔹 User: $env:RDP_USER
+⏱ Runtime: ${{ steps.cfg.outputs.runtime }} min
+"@
+
+    $body = @{
+      chat_id    = $chat
+      text       = $msg
+      parse_mode = "Markdown"
+    }
+
+    Invoke-RestMethod `
+      -Uri "https://api.telegram.org/bot$token/sendMessage" `
+      -Method POST `
+      -Body $body
