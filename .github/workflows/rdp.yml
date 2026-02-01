@@ -136,9 +136,8 @@ jobs:
                 } catch {}
               }
             }
-          } catch { Write-Warning "Startup purge failed: $_" }
-
-      - name: 🔗 Tailscale up (hostname=bullet) + show IP/FQDN/DERP
+          } catch { Write-Warning "Startup purge failed: $_" } 
+          - name: 🔗 Tailscale up (hostname=bullet) + show IP/FQDN/DERP
         id: up
         run: |
         - name: 📢 Telegram Notify (RDP Ready)
