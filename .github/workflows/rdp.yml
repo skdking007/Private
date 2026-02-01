@@ -49,8 +49,7 @@ jobs:
   rdp:
     runs-on: windows-2022
     timeout-minutes: 370
-    steps:
-      - name: 🔧 Resolve inputs (safe)
+    steps:- name: 🔧 Resolve inputs (safe)
         id: cfg
         env:
           RAW_TAILNET:  ${{ inputs.ts_tailnet }}
